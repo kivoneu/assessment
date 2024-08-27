@@ -1,0 +1,65 @@
+# Default values for spring-boot-api
+replicaCount:
+  dev: 3
+  prd: 5
+
+image:
+  repository: busybox
+  tag: stable
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: api
+    - port: 8081
+      targetPort: 8081
+      name: logs
+    - port: 8082
+      targetPort: 8082
+      name: soap
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: dev.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          port: 8080
+        - path: /logs
+          pathType: Prefix
+          port: 8081
+        - path: /soap
+          pathType: Prefix
+          port: 8082
+    - host: prd.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          port: 8080
+        - path: /logs
+          pathType: Prefix
+          port: 8081
+        - path: /soap
+          pathType: Prefix
+          port: 8082
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+springProfile:
+  dev: "--spring.profiles.active=dev"
+  prd: "--spring.profiles.active=prd"

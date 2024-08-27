@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "spring-boot-api.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "spring-boot-api.labels" . | nindent 4 }}
+  annotations:
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+spec:
+  {{- if eq .Release.Namespace "dev" }}
+  replicas: {{ .Values.replicaCount.dev }}
+  {{- else }}
+  replicas: {{ .Values.replicaCount.prd }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "spring-boot-api.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        {{- include "spring-boot-api.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if eq .Release.Namespace "dev" }}
+          args: ["{{ .Values.springProfile.dev }}"]
+          {{- else }}
+          args: ["{{ .Values.springProfile.prd }}"]
+          {{- end }}
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+            - containerPort: 8082
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.json
+              subPath: config.json
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "spring-boot-api.fullname" . }}-config
+      terminationGracePeriodSeconds: 30
+      lifecycle:
+        preStop:
+          exec:
+            command: ["wget", "http://localhost:8080/service/shutdown"]
